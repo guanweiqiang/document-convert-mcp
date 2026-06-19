@@ -1,0 +1,8 @@
+{
+  "inputDir": ".",
+  "outputDir": "./converted",
+  "from": "md",
+  "to": "html",
+  "recursive": false,
+  "overwrite": true
+}

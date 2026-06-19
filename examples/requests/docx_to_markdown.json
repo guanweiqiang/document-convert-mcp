@@ -1,0 +1,7 @@
+{
+  "inputPath": "sample.docx",
+  "outputPath": "sample.from-docx.md",
+  "markdownFlavor": "gfm",
+  "cleanForLLM": true,
+  "overwrite": true
+}

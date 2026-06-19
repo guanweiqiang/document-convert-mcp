@@ -1,4 +1,4 @@
-# document-converter-mcp
+# @lifeng688/document-converter-mcp
 
 A local-first MCP server for converting documents between Markdown, PDF, DOCX, and HTML, with AI-friendly Markdown output and safe file access.
 
@@ -92,13 +92,31 @@ python3 -c "import markitdown; print('ok')"
 ### Install the Server
 
 ```bash
-git clone https://github.com/your-org/document-converter-mcp.git
-cd document-converter-mcp
+npm install -g @lifeng688/document-converter-mcp
+```
+
+Or use directly via npx:
+
+```bash
+npx @lifeng688/document-converter-mcp
+```
+
+For development, clone the repo and build locally:
+
+```bash
+git clone https://github.com/guanweiqiang/document-convert-mcp.git
+cd document-convert-mcp
 npm install
 npm run build
 ```
 
 ## MCP Client Configuration
+
+Install the package globally first:
+
+```bash
+npm install -g @lifeng688/document-converter-mcp
+```
 
 ### Claude Desktop
 
@@ -108,19 +126,34 @@ Edit your Claude Desktop config (`~/Library/Application Support/Claude/claude_de
 {
   "mcpServers": {
     "document-converter": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/document-converter-mcp/dist/index.js"
-      ],
+      "command": "npx",
+      "args": ["-y", "@lifeng688/document-converter-mcp"],
       "env": {
-        "DOC_CONVERTER_WORKSPACE": "/absolute/path/to/your/documents"
+        "DOC_CONVERTER_WORKSPACE": "E:/MCPWorkDir"
       }
     }
   }
 }
 ```
 
-A sample config is provided in `examples/claude-desktop-config.json`.
+Or if installed globally, use the local path:
+
+```json
+{
+  "mcpServers": {
+    "document-converter": {
+      "command": "document-converter-mcp",
+      "env": {
+        "DOC_CONVERTER_WORKSPACE": "E:/MCPWorkDir"
+      }
+    }
+  }
+}
+```
+
+Sample configs are in `examples/`:
+- `mcp.json` — MCP Inspector config
+- `claude-desktop-config.json` — Claude Desktop config
 
 ## Tools
 

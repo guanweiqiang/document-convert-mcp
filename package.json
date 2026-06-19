@@ -1,5 +1,5 @@
 {
-  "name": "document-converter-mcp",
+  "name": "@lifeng688/document-converter-mcp",
   "version": "1.0.0",
   "description": "A local-first MCP server for converting documents between Markdown, PDF, DOCX, and HTML",
   "main": "dist/index.js",
@@ -26,6 +26,10 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guanweiqiang/document-convert-mcp.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "zod": "^3.24.4"
@@ -37,5 +41,12 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs",
+    "examples"
+  ]
 }

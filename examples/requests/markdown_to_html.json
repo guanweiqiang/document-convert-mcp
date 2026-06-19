@@ -1,0 +1,6 @@
+{
+  "inputPath": "sample.md",
+  "outputPath": "sample.html",
+  "standalone": true,
+  "overwrite": true
+}

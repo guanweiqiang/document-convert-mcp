@@ -1,0 +1,6 @@
+{
+  "inputPath": "sample.md",
+  "outputPath": "sample.docx",
+  "toc": false,
+  "overwrite": true
+}

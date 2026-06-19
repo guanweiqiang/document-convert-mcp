@@ -1,0 +1,10 @@
+{
+  "inputPath": "sample.md",
+  "outputPath": "sample.pdf",
+  "toc": true,
+  "pageSize": "A4",
+  "pdfEngine": "xelatex",
+  "cjkMainFont": "Microsoft YaHei",
+  "preserveSource": true,
+  "overwrite": true
+}

@@ -2,7 +2,10 @@
   "mcpServers": {
     "document-converter": {
       "command": "npx",
-      "args": ["-y", "@lifeng688/document-converter-mcp"],
+      "args": [
+        "-y",
+        "@lifeng688/document-converter-mcp"
+      ],
       "env": {
         "DOC_CONVERTER_WORKSPACE": "E:/MCPWorkDir"
       }

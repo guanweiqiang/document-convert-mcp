@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+.npm/
+
+# Source files
+src/
+tsconfig.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test and coverage
+coverage/
+.nyc_output/
+test-output/
+tests/output/
+tmp/
+temp/
+.cache/
+
+# Local MCP workspace / generated conversion outputs
+.mcp-workspace/
+workspace/
+outputs/
+converted/
+*.tmp
+*.md.tmp
+
+# Generated document files
+*.pdf
+*.docx
+*.html
+*.htm
+
+# npm pack artifacts
+*.tgz
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# GitHub / CI local files
+.github-local/

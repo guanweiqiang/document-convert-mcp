@@ -1,0 +1,8 @@
+{
+  "inputPath": "sample.pdf",
+  "outputPath": "sample.from-pdf.md",
+  "engine": "markitdown",
+  "preferSourceSidecar": true,
+  "cleanForLLM": true,
+  "overwrite": true
+}
