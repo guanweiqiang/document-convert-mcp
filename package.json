@@ -1,0 +1,41 @@
+{
+  "name": "document-converter-mcp",
+  "version": "1.0.0",
+  "description": "A local-first MCP server for converting documents between Markdown, PDF, DOCX, and HTML",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "document-converter-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "server",
+    "document-converter",
+    "markdown",
+    "pdf",
+    "docx",
+    "html",
+    "pandoc",
+    "markitdown"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

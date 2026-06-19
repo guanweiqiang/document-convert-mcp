@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "document-converter": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/document-converter-mcp/dist/index.js"
+      ],
+      "env": {
+        "DOC_CONVERTER_WORKSPACE": "/absolute/path/to/workspace"
+      }
+    }
+  }
+}

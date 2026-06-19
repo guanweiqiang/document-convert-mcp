@@ -1,0 +1,11 @@
+{
+  "tool": "markdown_to_pdf",
+  "arguments": {
+    "inputPath": "sample.md",
+    "outputPath": "sample.pdf",
+    "toc": true,
+    "pageSize": "A4",
+    "pdfEngine": "xelatex",
+    "overwrite": true
+  }
+}
