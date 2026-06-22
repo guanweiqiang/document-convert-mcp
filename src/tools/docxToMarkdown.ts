@@ -7,18 +7,84 @@ import { resolveOutputPath } from "../utils/outputPath.js";
 import { PandocConverter } from "../converters/pandoc.js";
 import { MarkItDownConverter } from "../converters/markitdown.js";
 
+/** Supported image file extensions for extraction scanning. */
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tif", ".tiff"]);
+
+/**
+ * Validate imageDir path: must be within workspace.
+ */
+function validateImageDir(imageDir: string): { ok: true } | { ok: false; error: string } {
+  const ws = getWorkspaceDir();
+  const resolved = path.resolve(ws, imageDir);
+  const rel = path.relative(ws, resolved);
+
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    return { ok: false, error: `Access denied: imageDir path escapes workspace directory (${imageDir})` };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Generate default image directory name from output markdown path.
+ * e.g. "out/docx-extract-images.md" -> "out/docx-extract-images_media"
+ */
+function generateDefaultImageDir(outputMdPath: string): string {
+  const dir = path.dirname(outputMdPath);
+  const base = path.basename(outputMdPath, ".md");
+  return path.join(dir, `${base}_media`);
+}
+
+/**
+ * Scan image directory and return image file metadata.
+ */
+function scanImages(absoluteImageDir: string): { imageCount: number; images: Array<{ filename: string; sizeBytes: number }> } {
+  if (!fs.existsSync(absoluteImageDir)) {
+    return { imageCount: 0, images: [] };
+  }
+
+  const images: Array<{ filename: string; sizeBytes: number }> = [];
+
+  function walk(dir: string) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (IMAGE_EXTS.has(ext)) {
+          try {
+            const stat = fs.statSync(fullPath);
+            images.push({
+              filename: path.relative(absoluteImageDir, fullPath),
+              sizeBytes: stat.size,
+            });
+          } catch {
+            // Ignore files we can't stat
+          }
+        }
+      }
+    }
+  }
+
+  walk(absoluteImageDir);
+  return { imageCount: images.length, images };
+}
+
 /**
  * Tool handler: docx_to_markdown
  * Converts a DOCX file to Markdown using Pandoc or MarkItDown.
  *
  * v0.2.0: resolved input path is now passed to converters (absolute path).
+ * v0.2.0: extractImages/imageDir support with pathGuard, default imageDir, image scanning.
  */
 export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<ConvertResult> {
   const {
     inputPath,
     outputPath,
     extractImages,
-    imageDir,
+    imageDir: paramImageDir,
     engine: preferredEngine,
     markdownFlavor,
     cleanForLLM,
@@ -75,11 +141,40 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
 
   logger.info(`docx_to_markdown: ${inputPath} -> ${resolvedOutput} (engine=${engine}, flavor=${flavor})`);
 
-  const warnings: string[] = [];
+  // ── Image extraction setup ──────────────────────────────────────────
+  let imageDirResolved: string | undefined;
+  let imageDirRelative: string | undefined;
+  let imageScanResult: { imageCount: number; images: Array<{ filename: string; sizeBytes: number }> } | undefined;
 
-  if (extractImages && imageDir) {
-    warnings.push("Image extraction is not yet fully implemented. Images may be embedded as base64 in the Markdown.");
+  if (extractImages) {
+    if (paramImageDir) {
+      // Validate user-provided imageDir
+      const imageDirValidation = validateImageDir(paramImageDir);
+      if (!imageDirValidation.ok) {
+        return {
+          success: false,
+          input: inputPath,
+          output: resolvedOutput,
+          engine,
+          warnings: [],
+          error: imageDirValidation.error,
+        };
+      }
+      imageDirResolved = path.resolve(ws, paramImageDir);
+      imageDirRelative = paramImageDir;
+    } else {
+      // Generate default imageDir from output basename
+      imageDirRelative = generateDefaultImageDir(resolvedOutput);
+      imageDirResolved = path.resolve(ws, imageDirRelative);
+    }
+
+    // Ensure image directory exists
+    if (!fs.existsSync(imageDirResolved)) {
+      fs.mkdirSync(imageDirResolved, { recursive: true });
+    }
   }
+
+  const warnings: string[] = [];
 
   if (engine === "markitdown") {
     // Use RESOLVED absolute paths
@@ -92,10 +187,19 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
     if (result.success) {
       warnings.push("MarkItDown may lose complex table formatting compared to Pandoc.");
     }
+
+    // Attach image metadata even for markitdown (may be empty if not extracted)
+    if (extractImages && imageDirResolved) {
+      imageScanResult = scanImages(imageDirResolved);
+      (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).imageCount = imageScanResult.imageCount;
+      (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).imageDir = imageDirRelative ?? imageDirResolved;
+      (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).images = imageScanResult.images;
+    }
+
     return { ...result, warnings: [...warnings, ...result.warnings] };
   }
 
-  // Pandoc path — resolve output format based on markdownFlavor
+  // ── Pandoc path ─────────────────────────────────────────────────────
   const formatMap: Record<string, string> = {
     gfm: "gfm",
     commonmark: "commonmark",
@@ -109,9 +213,9 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
     `--markdown-headings=atx`,
   ];
 
-  if (extractImages && imageDir) {
-    const imgDirResolved = path.resolve(ws, imageDir);
-    extraArgs.push("--extract-media", imgDirResolved);
+  // Pass --extract-media to Pandoc when image extraction is enabled
+  if (extractImages && imageDirResolved) {
+    extraArgs.push(`--extract-media=${imageDirResolved}`);
   }
 
   // Use RESOLVED absolute input path
@@ -122,6 +226,14 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
     const cleaned = cleanMarkdown(result.details.stdout);
     fs.writeFileSync(path.resolve(ws, resolvedOutput), cleaned);
     result.details.stdout = cleaned;
+  }
+
+  // Scan image directory after conversion
+  if (extractImages && imageDirResolved) {
+    imageScanResult = scanImages(imageDirResolved);
+    (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).imageCount = imageScanResult.imageCount;
+    (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).imageDir = imageDirRelative ?? imageDirResolved;
+    (result as ConvertResult & { imageCount?: number; imageDir?: string; images?: unknown[] }).images = imageScanResult.images;
   }
 
   if (!result.success) {

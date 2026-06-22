@@ -5,3 +5,7 @@ dist/
 .DS_Store
 
 *.tar.gz
+
+RELEASE_NOTES.md
+
+.tgz

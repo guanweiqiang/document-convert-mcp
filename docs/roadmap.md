@@ -35,7 +35,7 @@
 
 ## v0.2.0 — Usability & Diagnostics
 
-**Status: Current / In Progress**
+**Status: Released**
 
 **Positioning:** Make local conversions easier to diagnose and better suited for real-world batch usage.
 
@@ -137,18 +137,19 @@ Improve `docx_to_markdown` image extraction:
 
 ### Documentation and Tests
 
-- Update README
-- Update tool schema docs
+- Update README -- Done
+- Update tool schema docs -- Done
 - Update conversion quality docs
-- Add release notes for v0.2.0
+- Add release notes for v0.2.0 -- Done
 - Add MCP JSON tests for:
-  - `doctor` tool
-  - config loading
-  - batch dry run
-  - batch include/exclude
-  - PDF style options
-  - HTML style options
-  - DOCX image extraction
+  - `doctor` tool -- Done
+  - config loading -- Done
+  - batch dry run -- Done
+  - batch include/exclude -- Done
+  - PDF style options -- Done
+  - HTML style options -- Done
+  - DOCX image extraction -- Done
+  - PDF sidecar roundtrip -- Done
 
 ---
 

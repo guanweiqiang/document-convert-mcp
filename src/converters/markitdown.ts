@@ -190,9 +190,38 @@ export class MarkItDownConverter {
 
   /**
    * Extract text content from DOCX using markitdown.
+   * Wraps convert() with DOCX-specific error messages for MissingDependencyException.
    */
   static async extractDocx(inputPath: string, outputPath?: string): Promise<ConvertResult> {
-    return this.convert(inputPath, outputPath);
+    const result = await this.convert(inputPath, outputPath);
+
+    // If the result is a MissingDependencyException-style error, reclassify as DOCX
+    if (!result.success && result.error?.includes("PDF support")) {
+      // Check if this was actually a DOCX dependency error by re-running with more context
+      // For now, provide a generic DOCX error message
+      const stderrLower = (result.details?.stderr ?? "").toLowerCase();
+      const stdoutLower = (result.details?.stdout ?? "").toLowerCase();
+      const combined = stderrLower + " " + stdoutLower;
+
+      if (combined.includes("missingdependencyexception") ||
+          combined.includes("[docx]") ||
+          combined.includes("docx")) {
+        return {
+          ...result,
+          warnings: ["MarkItDown is installed, but DOCX support requires optional dependencies."],
+          error: 'MarkItDown DOCX support is not installed. Run: python -m pip install -U "markitdown[docx]" or "markitdown[all]"',
+        };
+      }
+
+      // If we can't determine the format from the error, still report DOCX since that's what was called
+      return {
+        ...result,
+        warnings: ["MarkItDown DOCX support requires optional dependencies."],
+        error: 'MarkItDown DOCX support is not installed. Run: python -m pip install -U "markitdown[docx]" or "markitdown[all]"',
+      };
+    }
+
+    return result;
   }
 
   private static detectPythonCommand(): string {
