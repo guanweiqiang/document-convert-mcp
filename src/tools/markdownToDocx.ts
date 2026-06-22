@@ -1,6 +1,6 @@
 import type { ConvertResult, MarkdownToDocxParams } from "../types/convert.js";
 import { logger } from "../utils/logger.js";
-import { validateInputPath, validateOutputPath, outputExists } from "../utils/pathGuard.js";
+import { validateInputPath, validateOutputPath, outputExists, getWorkspaceDir } from "../utils/pathGuard.js";
 import { resolveOutputPath } from "../utils/outputPath.js";
 import { PandocConverter } from "../converters/pandoc.js";
 import { validateMarkdown } from "../utils/markdownPreflight.js";
@@ -10,9 +10,12 @@ import path from "path";
 /**
  * Tool handler: markdown_to_docx
  * Converts a Markdown file to DOCX using Pandoc.
+ *
+ * v0.2.0: resolved input path is now passed to Pandoc (absolute path).
  */
 export async function markdownToDocx(params: MarkdownToDocxParams): Promise<ConvertResult> {
   const { inputPath, outputPath, referenceDocx, toc, overwrite, strictMarkdown } = params;
+  const ws = getWorkspaceDir();
 
   // Validate input
   const inputValidation = validateInputPath(inputPath);
@@ -27,12 +30,13 @@ export async function markdownToDocx(params: MarkdownToDocxParams): Promise<Conv
     };
   }
 
+  // Resolve input to absolute workspace path
+  const resolvedInput = path.resolve(ws, inputPath);
+
   // Preflight: read and validate Markdown content
-  const ws = path.dirname(inputPath);
-  const fullPath = path.resolve(ws, inputPath);
   let preflightWarnings: string[] = [];
-  if (fs.existsSync(fullPath)) {
-    const content = fs.readFileSync(fullPath, "utf-8");
+  if (fs.existsSync(resolvedInput)) {
+    const content = fs.readFileSync(resolvedInput, "utf-8");
     const preflight = validateMarkdown(content);
     preflightWarnings = preflight.warnings;
     if (strictMarkdown && !preflight.ok) {
@@ -92,10 +96,12 @@ export async function markdownToDocx(params: MarkdownToDocxParams): Promise<Conv
         error: `Reference docx validation failed: ${refValidation.error}`,
       };
     }
-    extraArgs.push("--reference-doc", referenceDocx);
+    const resolvedRef = path.resolve(ws, referenceDocx);
+    extraArgs.push("--reference-doc", resolvedRef);
   }
 
-  const result = await PandocConverter.convert(inputPath, resolvedOutput, "markdown", "docx", extraArgs);
+  // Use RESOLVED absolute input path
+  const result = await PandocConverter.convert(resolvedInput, resolvedOutput, "markdown", "docx", extraArgs);
 
   // Attach preflight warnings
   if (preflightWarnings.length > 0) {

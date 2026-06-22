@@ -66,10 +66,12 @@ function cleanForLLM(text: string): string {
  *
  * IMPORTANT: This is CONTENT EXTRACTION, NOT layout or semantic structure reconstruction.
  * PDF files usually do not preserve Markdown semantics.
- * Tables, headings, code blocks, lists, and reading order may not be reliably recovered.
+ *
+ * v0.2.0: resolved input path is now passed to converters (absolute path).
  */
 export async function pdfToMarkdown(params: PdfToMarkdownParams): Promise<ConvertResult> {
   const { inputPath, outputPath, engine: preferredEngine, cleanForLLM: doCleanForLLM, preferSourceSidecar, overwrite } = params;
+  const ws = getWorkspaceDir();
 
   const engine = preferredEngine ?? "markitdown";
   const effectivePreferSidecar = preferSourceSidecar ?? true;
@@ -87,6 +89,9 @@ export async function pdfToMarkdown(params: PdfToMarkdownParams): Promise<Conver
       quality: TEXT_EXTRACTION_QUALITY,
     };
   }
+
+  // Resolve input to absolute workspace path
+  const resolvedInput = path.resolve(ws, inputPath);
 
   // Resolve output path
   const resolvedOutput = resolveOutputPath(inputPath, outputPath, "md");
@@ -122,7 +127,6 @@ export async function pdfToMarkdown(params: PdfToMarkdownParams): Promise<Conver
 
   // --- Sidecar recovery path ---
   if (effectivePreferSidecar) {
-    const ws = getWorkspaceDir();
     const sidecarPath = path.resolve(ws, buildSourceSidecarPath(inputPath));
 
     if (fs.existsSync(sidecarPath)) {
@@ -172,19 +176,20 @@ export async function pdfToMarkdown(params: PdfToMarkdownParams): Promise<Conver
   let result: ConvertResult;
 
   if (engine === "markitdown") {
-    result = await MarkItDownConverter.extractPdf(inputPath, resolvedOutput);
+    // Use RESOLVED absolute input path
+    result = await MarkItDownConverter.extractPdf(resolvedInput, resolvedOutput);
     // Add friendly hint if MarkItDown lacks PDF optional deps
     if (!result.success && result.error && typeof result.error === "string" && result.error.includes("optional")) {
       warnings.push("MarkItDown PDF support requires optional dependencies. Install with: pip install -U \"markitdown[pdf]\"");
     }
   } else {
-    result = await PandocConverter.convert(inputPath, resolvedOutput, "pdf", "markdown", []);
+    // Use RESOLVED absolute input path
+    result = await PandocConverter.convert(resolvedInput, resolvedOutput, "pdf", "markdown", []);
   }
 
   // Post-process: clean for LLM (conservative only)
   if (doCleanForLLM && result.success && result.details?.stdout) {
     const cleaned = cleanForLLM(result.details.stdout);
-    const ws = getWorkspaceDir();
     fs.writeFileSync(path.resolve(ws, resolvedOutput), cleaned);
     result.details.stdout = cleaned;
   }

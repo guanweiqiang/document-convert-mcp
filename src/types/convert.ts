@@ -49,6 +49,10 @@ export interface MarkdownToPdfParams {
   preserveSource?: boolean;
   overwrite?: boolean;
   strictMarkdown?: boolean;
+  margin?: string;
+  highlightStyle?: string;
+  numberSections?: boolean;
+  metadata?: Record<string, string>;
 }
 
 export interface MarkdownToDocxParams {
@@ -87,14 +91,23 @@ export interface MarkdownToHtmlParams {
   standalone?: boolean;
   overwrite?: boolean;
   strictMarkdown?: boolean;
+  theme?: string;
+  embedCss?: boolean;
+  selfContained?: boolean;
+  highlightStyle?: string;
 }
 
 export interface BatchConvertParams {
   inputDir: string;
   outputDir: string;
-  from: "md" | "markdown" | "docx" | "pdf";
-  to: "md" | "markdown" | "docx" | "pdf" | "html";
+  from: string;  // accept string; server validates against enum
+  to: string;    // accept string; server validates against enum
   recursive?: boolean;
   overwrite?: boolean;
   cleanForLLM?: boolean;
+  dryRun?: boolean;
+  include?: string[];
+  exclude?: string[];
+  maxConcurrency?: number;
+  continueOnError?: boolean;
 }

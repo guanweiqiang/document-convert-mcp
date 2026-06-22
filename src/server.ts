@@ -15,6 +15,7 @@ import { docxToMarkdown } from "./tools/docxToMarkdown.js";
 import { pdfToMarkdown } from "./tools/pdfToMarkdown.js";
 import { markdownToHtml } from "./tools/markdownToHtml.js";
 import { batchConvert } from "./tools/batchConvert.js";
+import { doctor } from "./tools/doctor.js";
 
 /**
  * Create the MCP server instance with all conversion tools registered.
@@ -43,7 +44,11 @@ export function createServer(): McpServer {
         "- cjkMainFont (string, optional): CJK main font used by xelatex for Chinese/Japanese/Korean PDF output. Example: 'Microsoft YaHei', 'SimSun', 'Noto Sans CJK SC'\n" +
         "- preserveSource (boolean, optional): When true, save the original Markdown as a sidecar file (e.g. sample.pdf.source.md) for accurate PDF-to-Markdown recovery. Defaults to false\n" +
         "- strictMarkdown (boolean, optional): If true, reject files with structural issues (unclosed code blocks). Defaults to false\n" +
-        "- overwrite (boolean, optional): Allow overwriting existing output. Defaults to false",
+        "- overwrite (boolean, optional): Allow overwriting existing output. Defaults to false\n" +
+        "- margin (string, optional): Page margin (e.g. '1in', '2cm', '20mm', '72pt'). Validated against safe format\n" +
+        "- highlightStyle (string, optional): Code highlight theme — 'default', 'tango', 'pygments', 'kate', 'monochrome', 'github', 'darkblue', 'emacs', 'friendly', 'fruity', 'native', 'trac', 'borland'\n" +
+        "- numberSections (boolean, optional): Number sections. Defaults to false\n" +
+        "- metadata (object, optional): Additional metadata key-value pairs",
       inputSchema: {
         inputPath: z.string().describe("Path to the input Markdown file (relative to workspace)"),
         outputPath: z.string().optional().describe("Path for the output PDF file (relative to workspace). Auto-derived if omitted."),
@@ -56,6 +61,10 @@ export function createServer(): McpServer {
         preserveSource: z.boolean().optional().describe("When true, save the original Markdown as a sidecar file (e.g. sample.pdf.source.md) for accurate PDF-to-Markdown recovery. Defaults to false."),
         strictMarkdown: z.boolean().optional().describe("If true, reject input if Markdown has structural issues like unclosed code blocks."),
         overwrite: z.boolean().optional().describe("Allow overwriting existing output file. Defaults to false."),
+        margin: z.string().optional().describe("Page margin in safe format (e.g. '1in', '2cm', '20mm', '72pt')."),
+        highlightStyle: z.string().optional().describe("Code highlight theme. Valid values: default, tango, pygments, kate, monochrome, github, darkblue, emacs, friendly, fruity, native, trac, borland."),
+        numberSections: z.boolean().optional().describe("Number sections in the PDF."),
+        metadata: z.record(z.string()).optional().describe("Additional metadata key-value pairs."),
       },
       annotations: {
         readOnlyHint: true,
@@ -77,6 +86,10 @@ export function createServer(): McpServer {
         preserveSource: args.preserveSource,
         strictMarkdown: args.strictMarkdown,
         overwrite: args.overwrite ?? false,
+        margin: args.margin,
+        highlightStyle: args.highlightStyle,
+        numberSections: args.numberSections,
+        metadata: args.metadata,
       });
       return formatResponse(result);
     }
@@ -230,6 +243,10 @@ export function createServer(): McpServer {
         "- outputPath (string, optional): Output path. Defaults to same name with .html\n" +
         "- cssPath (string, optional): Path to a CSS stylesheet to embed\n" +
         "- standalone (boolean, optional): Generate a complete HTML document with head/body. Defaults to true\n" +
+        "- theme (string, optional): Pandoc HTML theme — 'default', 'github', 'academic', 'monochrome', 'bookish', 'mangoe', 'slaper', 'quarto'\n" +
+        "- embedCss (boolean, optional): Embed CSS/resources into the HTML document\n" +
+        "- selfContained (boolean, optional): Generate a self-contained HTML file with all resources embedded\n" +
+        "- highlightStyle (string, optional): Code highlight theme — 'default', 'tango', 'pygments', 'kate', 'monochrome', 'github', 'darkblue', 'emacs', 'friendly', 'fruity', 'native', 'trac', 'borland'\n" +
         "- strictMarkdown (boolean, optional): If true, reject files with structural issues (unclosed code blocks). Defaults to false\n" +
         "- overwrite (boolean, optional): Allow overwriting. Defaults to false",
       inputSchema: {
@@ -237,6 +254,10 @@ export function createServer(): McpServer {
         outputPath: z.string().optional().describe("Output HTML path (relative to workspace). Auto-derived if omitted."),
         cssPath: z.string().optional().describe("Path to a CSS stylesheet file (relative to workspace)"),
         standalone: z.boolean().optional().describe("Generate a standalone HTML document with head/body"),
+        theme: z.string().optional().describe("Pandoc HTML theme. Valid values: default, github, academic, monochrome, bookish, mangoe, slaper, quarto."),
+        embedCss: z.boolean().optional().describe("Embed CSS and other resources into the HTML output"),
+        selfContained: z.boolean().optional().describe("Generate a self-contained HTML file with all resources embedded"),
+        highlightStyle: z.string().optional().describe("Code highlight style/theme. Valid values: default, tango, pygments, kate, monochrome, github, darkblue, emacs, friendly, fruity, native, trac, borland."),
         strictMarkdown: z.boolean().optional().describe("If true, reject input if Markdown has structural issues like unclosed code blocks."),
         overwrite: z.boolean().optional().describe("Allow overwriting existing output file. Defaults to false."),
       },
@@ -255,6 +276,10 @@ export function createServer(): McpServer {
         standalone: args.standalone ?? true,
         strictMarkdown: args.strictMarkdown,
         overwrite: args.overwrite ?? false,
+        theme: args.theme,
+        embedCss: args.embedCss,
+        selfContained: args.selfContained,
+        highlightStyle: args.highlightStyle,
       });
       return formatResponse(result);
     }
@@ -271,19 +296,29 @@ export function createServer(): McpServer {
         "Arguments:\n" +
         "- inputDir (string, required): Source directory (relative to workspace)\n" +
         "- outputDir (string, required): Destination directory (relative to workspace)\n" +
-        "- from (enum, required): Source format — 'md', 'markdown', 'docx', or 'pdf'\n" +
-        "- to (enum, required): Target format — 'md', 'markdown', 'docx', 'pdf', or 'html'\n" +
+        "- from (string, required): Source format — 'md', 'markdown', 'docx', or 'pdf'\n" +
+        "- to (string, required): Target format — 'md', 'markdown', 'docx', 'pdf', or 'html'\n" +
         "- recursive (boolean, optional): Traverse subdirectories. Defaults to false\n" +
         "- overwrite (boolean, optional): Overwrite existing files. Defaults to false\n" +
-        "- cleanForLLM (boolean, optional): Clean Markdown output for LLM consumption",
+        "- cleanForLLM (boolean, optional): Clean Markdown output for LLM consumption\n" +
+        "- dryRun (boolean, optional): Only generate plan, do not write files. Defaults to false\n" +
+        "- include (string[], optional): Only convert files matching these glob patterns (e.g. ['a.md'])\n" +
+        "- exclude (string[], optional): Skip files matching these glob patterns (e.g. ['skip-*'])\n" +
+        "- maxConcurrency (number, optional): Max concurrent conversions (1-8, default 1)\n" +
+        "- continueOnError (boolean, optional): Continue on individual file failures. Defaults to true",
       inputSchema: {
         inputDir: z.string().describe("Source directory path (relative to workspace)"),
         outputDir: z.string().describe("Destination directory path (relative to workspace)"),
-        from: z.enum(["md", "markdown", "docx", "pdf"]).describe("Source file format"),
-        to: z.enum(["md", "markdown", "docx", "pdf", "html"]).describe("Target file format"),
+        from: z.string().describe("Source file format: md, markdown, docx, or pdf"),
+        to: z.string().describe("Target file format: md, markdown, docx, pdf, or html"),
         recursive: z.boolean().optional().describe("Traverse subdirectories recursively"),
         overwrite: z.boolean().optional().describe("Overwrite existing output files. Defaults to false."),
         cleanForLLM: z.boolean().optional().describe("Clean Markdown output for LLM consumption"),
+        dryRun: z.boolean().optional().describe("Only generate a plan without writing files. Defaults to false."),
+        include: z.array(z.string()).optional().describe("Only convert files matching these glob patterns (e.g. ['a.md', '*.txt'])"),
+        exclude: z.array(z.string()).optional().describe("Skip files matching these glob patterns (e.g. ['skip-*', 'draft-*'])"),
+        maxConcurrency: z.number().int().min(1).max(8).optional().describe("Maximum concurrent conversions (1-8, default 1)"),
+        continueOnError: z.boolean().optional().describe("Continue processing on individual file failures. Defaults to true."),
       },
       annotations: {
         readOnlyHint: true,
@@ -301,8 +336,46 @@ export function createServer(): McpServer {
         recursive: args.recursive ?? false,
         overwrite: args.overwrite ?? false,
         cleanForLLM: args.cleanForLLM ?? false,
+        dryRun: args.dryRun ?? false,
+        include: args.include,
+        exclude: args.exclude,
+        maxConcurrency: args.maxConcurrency,
+        continueOnError: args.continueOnError ?? true,
       });
       return formatBatchResponse(result);
+    }
+  );
+
+  // --- doctor ---
+  server.registerTool(
+    "doctor",
+    {
+      title: "Environment Diagnostics",
+      description:
+        "Check the local environment for document-converter-mcp dependencies.\n" +
+        "Verifies Node.js, workspace, Pandoc, Python, MarkItDown, and PDF engines.\n" +
+        "This tool never fails due to missing dependencies — missing tools appear as false in the output with warnings.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async () => {
+      const result = await doctor();
+      if (result.success) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          structuredContent: result,
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        isError: true,
+        structuredContent: result,
+      };
     }
   );
 
@@ -336,26 +409,24 @@ function formatResponse(result: ConvertResult): {
  */
 function formatBatchResponse(result: {
   success: boolean;
+  summary: string;
   total: number;
+  plannedCount: number;
+  skippedCount: number;
   successCount: number;
   failedCount: number;
-  results: ConvertResult[];
+  durationMs: number;
+  results: Array<Record<string, unknown>>;
+  error?: string;
 }): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: typeof result;
   isError?: boolean;
 } {
-  if (result.successCount > 0) {
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      structuredContent: result,
-    };
-  }
-
   return {
     content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    isError: true,
     structuredContent: result,
+    isError: !result.success,
   };
 }
 

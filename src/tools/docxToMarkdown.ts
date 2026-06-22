@@ -10,6 +10,8 @@ import { MarkItDownConverter } from "../converters/markitdown.js";
 /**
  * Tool handler: docx_to_markdown
  * Converts a DOCX file to Markdown using Pandoc or MarkItDown.
+ *
+ * v0.2.0: resolved input path is now passed to converters (absolute path).
  */
 export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<ConvertResult> {
   const {
@@ -25,6 +27,7 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
 
   const engine = preferredEngine ?? "pandoc";
   const flavor = markdownFlavor ?? "gfm";
+  const ws = getWorkspaceDir();
 
   // Validate input
   const inputValidation = validateInputPath(inputPath);
@@ -38,6 +41,9 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
       error: inputValidation.error,
     };
   }
+
+  // Resolve input to absolute workspace path
+  const resolvedInput = path.resolve(ws, inputPath);
 
   // Resolve output path
   const resolvedOutput = resolveOutputPath(inputPath, outputPath, "md");
@@ -76,10 +82,10 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
   }
 
   if (engine === "markitdown") {
-    const result = await MarkItDownConverter.extractDocx(inputPath, resolvedOutput);
+    // Use RESOLVED absolute paths
+    const result = await MarkItDownConverter.extractDocx(resolvedInput, resolvedOutput);
     if (cleanForLLM && result.success && result.details?.stdout) {
       const cleaned = cleanMarkdown(result.details.stdout);
-      const ws = getWorkspaceDir();
       fs.writeFileSync(path.resolve(ws, resolvedOutput), cleaned);
       result.details.stdout = cleaned;
     }
@@ -104,16 +110,16 @@ export async function docxToMarkdown(params: DocxToMarkdownParams): Promise<Conv
   ];
 
   if (extractImages && imageDir) {
-    const imgDirResolved = path.resolve(getWorkspaceDir(), imageDir);
+    const imgDirResolved = path.resolve(ws, imageDir);
     extraArgs.push("--extract-media", imgDirResolved);
   }
 
-  const result = await PandocConverter.convert(inputPath, resolvedOutput, "docx", "markdown", extraArgs);
+  // Use RESOLVED absolute input path
+  const result = await PandocConverter.convert(resolvedInput, resolvedOutput, "docx", "markdown", extraArgs);
 
   // Post-process: clean for LLM
   if (cleanForLLM && result.success && result.details?.stdout) {
     const cleaned = cleanMarkdown(result.details.stdout);
-    const ws = getWorkspaceDir();
     fs.writeFileSync(path.resolve(ws, resolvedOutput), cleaned);
     result.details.stdout = cleaned;
   }

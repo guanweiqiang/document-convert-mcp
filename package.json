@@ -1,6 +1,6 @@
 {
   "name": "@lifeng688/document-converter-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A local-first MCP server for converting documents between Markdown, PDF, DOCX, and HTML",
   "main": "dist/index.js",
   "type": "module",

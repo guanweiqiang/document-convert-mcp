@@ -6,6 +6,7 @@ import { PandocConverter } from "../converters/pandoc.js";
 import { validateMarkdown } from "../utils/markdownPreflight.js";
 import fs from "fs";
 import path from "path";
+import { loadConfig, mergePdfParamsWithConfig } from "../utils/configLoader.js";
 
 /**
  * Detect whether content contains CJK (Chinese/Japanese/Korean) characters.
@@ -46,7 +47,42 @@ function buildSourceSidecarPath(pdfInputPath: string): string {
  * Converts a Markdown file to PDF using Pandoc.
  */
 export async function markdownToPdf(params: MarkdownToPdfParams): Promise<ConvertResult> {
-  const { inputPath, outputPath, title, toc, pageSize, theme, pdfEngine, cjkMainFont, preserveSource, overwrite, strictMarkdown } = params;
+  const ws = getWorkspaceDir();
+
+  // Load and merge with config defaults (tool args override config)
+  const config = loadConfig(ws);
+  const merged = mergePdfParamsWithConfig(params, config);
+
+  const { inputPath, outputPath, title, toc, pageSize, theme, pdfEngine, cjkMainFont, preserveSource, overwrite, strictMarkdown, margin, highlightStyle, numberSections, metadata } = merged;
+
+  // ── Validate highlightStyle ─────────────────────────────────────────
+  const VALID_HIGHLIGHT_STYLES = new Set([
+    "default", "tango", "pygments", "kate", "monochrome", "github", "darkblue",
+    "emacs", "friendly", "fruity", "native", "trac", "borland",
+  ]);
+  if (highlightStyle !== undefined && !VALID_HIGHLIGHT_STYLES.has(highlightStyle)) {
+    return {
+      success: false,
+      input: inputPath,
+      output: outputPath,
+      engine: "pandoc",
+      warnings: [],
+      error: `Invalid highlightStyle: "${highlightStyle}". Valid styles are: ${[...VALID_HIGHLIGHT_STYLES].join(", ")}.`,
+    };
+  }
+
+  // ── Validate margin ─────────────────────────────────────────────────
+  const MARGIN_RE = /^\d+(\.\d+)?(in|cm|mm|pt)$/;
+  if (margin !== undefined && !MARGIN_RE.test(margin)) {
+    return {
+      success: false,
+      input: inputPath,
+      output: outputPath,
+      engine: "pandoc",
+      warnings: [],
+      error: `Invalid margin: "${margin}". Expected formats like 1in, 2cm, 20mm, 72pt.`,
+    };
+  }
 
   // Validate input
   const inputValidation = validateInputPath(inputPath);
@@ -62,12 +98,11 @@ export async function markdownToPdf(params: MarkdownToPdfParams): Promise<Conver
   }
 
   // Preflight: read and validate Markdown content
-  const ws = getWorkspaceDir();
-  const fullPath = path.resolve(ws, inputPath);
+  const resolvedInput = path.resolve(ws, inputPath);
   let preflightWarnings: string[] = [];
   let markdownContent = "";
-  if (fs.existsSync(fullPath)) {
-    markdownContent = fs.readFileSync(fullPath, "utf-8");
+  if (fs.existsSync(resolvedInput)) {
+    markdownContent = fs.readFileSync(resolvedInput, "utf-8");
     const preflight = validateMarkdown(markdownContent);
     preflightWarnings = preflight.warnings;
     if (strictMarkdown && !preflight.ok) {
@@ -121,6 +156,14 @@ export async function markdownToPdf(params: MarkdownToPdfParams): Promise<Conver
     extraArgs.push("-V", `papersize:${paperSize}`);
   }
   if (pdfEngine) extraArgs.push("--pdf-engine", pdfEngine);
+  if (margin) extraArgs.push("-V", `margin=${margin}`);
+  if (highlightStyle) extraArgs.push("--highlight-style", highlightStyle);
+  if (numberSections) extraArgs.push("--number-sections");
+  if (metadata) {
+    for (const [k, v] of Object.entries(metadata)) {
+      extraArgs.push("--metadata", `${k}=${v}`);
+    }
+  }
 
   // CJK font handling
   const hasChineseContent = markdownContent !== "" && hasCjk(markdownContent);
@@ -149,7 +192,7 @@ export async function markdownToPdf(params: MarkdownToPdfParams): Promise<Conver
     `pandoc command: pandoc ${JSON.stringify(extraArgs)}`
   );
 
-  const result = await PandocConverter.convert(inputPath, resolvedOutput, "markdown", "pdf", extraArgs);
+  const result = await PandocConverter.convert(resolvedInput, resolvedOutput, "markdown", "pdf", extraArgs);
 
   // Enhance PDF-engine-specific errors
   const enhanced = enhancePdfError(result);
